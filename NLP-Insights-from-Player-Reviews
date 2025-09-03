@@ -1,0 +1,64 @@
+# nlp_player_reviews.py
+import streamlit as st
+import pandas as pd
+import numpy as np
+from textblob import TextBlob
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.decomposition import LatentDirichletAllocation
+import plotly.express as px
+
+st.set_page_config(page_title="NLP Insights from Player Reviews", layout="wide")
+st.title("📝 NLP Insights from Player Reviews")
+
+# -------------------------------
+# 1. Simulate Player Reviews
+# -------------------------------
+reviews = [
+    "I love the gameplay and graphics!", "The ads are too annoying", "Great rewards system",
+    "The game crashes often", "Amazing story and missions", "Not enough levels",
+    "Customer support is helpful", "Too many microtransactions", "Love the multiplayer mode",
+    "Game is addictive but battery drains fast"
+]
+num_reviews = 500
+
+data = pd.DataFrame({
+    'review_id': range(1, num_reviews + 1),
+    'review_text': np.random.choice(reviews, num_reviews)
+})
+
+# -------------------------------
+# 2. Sentiment Analysis
+# -------------------------------
+st.subheader("📊 Sentiment Analysis")
+data['polarity'] = data['review_text'].apply(lambda x: TextBlob(x).sentiment.polarity)
+data['sentiment'] = data['polarity'].apply(lambda x: 'Positive' if x > 0 else ('Negative' if x < 0 else 'Neutral'))
+
+sentiment_counts = data['sentiment'].value_counts().reset_index()
+sentiment_counts.columns = ['Sentiment', 'Count']
+fig_sentiment = px.pie(sentiment_counts, names='Sentiment', values='Count', title="Sentiment Distribution",
+                       color='Sentiment', color_discrete_map={'Positive':'green','Neutral':'gray','Negative':'red'})
+st.plotly_chart(fig_sentiment, use_container_width=True)
+
+# -------------------------------
+# 3. Topic Modeling
+# -------------------------------
+st.subheader("💡 Topic Modeling")
+vectorizer = CountVectorizer(stop_words='english')
+X = vectorizer.fit_transform(data['review_text'])
+
+lda = LatentDirichletAllocation(n_components=3, random_state=42)
+lda.fit(X)
+
+topics = {}
+for idx, topic in enumerate(lda.components_):
+    top_words = [vectorizer.get_feature_names_out()[i] for i in topic.argsort()[-5:]]
+    topics[f"Topic {idx+1}"] = ", ".join(top_words)
+
+st.write("Top 3 Topics Identified from Reviews:")
+st.table(pd.DataFrame(list(topics.items()), columns=['Topic', 'Keywords']))
+
+# -------------------------------
+# 4. Reviews Table
+# -------------------------------
+st.subheader("Recent Player Reviews")
+st.dataframe(data[['review_id','review_text','sentiment','polarity']].head(20))
